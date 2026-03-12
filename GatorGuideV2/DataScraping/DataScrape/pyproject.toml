@@ -1,0 +1,13 @@
+[project]
+name = "college-scorecard-scraper"
+version = "0.1.0"
+description = "Scrape College Scorecard API and load normalized data into MySQL"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "requests>=2.31.0",
+    "mysql-connector-python>=8.2.0,!=9.6.0",
+    "python-dotenv>=1.0.0",
+    "pandas>=3.0.0",
+    "openpyxl>=3.1.5",
+]
+

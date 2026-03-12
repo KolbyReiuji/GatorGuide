@@ -5,10 +5,7 @@ from .serializer import UserSerializer
 from .models import User
 # Create your views here.
 
-@api_view(['GET'])
-def get_users(request):
-    return Response(UserSerializer(User.objects.all(), many=True).data)
-
+# Write your create_user function here
 @api_view(['POST'])
 def create_user(request):
     serializer = UserSerializer(data=request.data)
@@ -16,3 +13,10 @@ def create_user(request):
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# @api_view(['PUT'])
+# Write your update_user function here
+
+
+# @api_view(['DELETE'])
+# Write your delete_user function here

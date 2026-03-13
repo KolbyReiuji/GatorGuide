@@ -31,16 +31,23 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    # Interface stuffs
+    'admin_interface',
+    'colorfield',
+    # Default Django apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
+    # Custom apps
     'rest_framework',
     'API',
 ]
+
+X_FRAME_OPTIONS = "SAMEORIGIN"
+SILENCED_SYSTEM_CHECKS = ["security.W019"]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

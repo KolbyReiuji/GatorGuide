@@ -1,250 +1,98 @@
-"""
-API Client Module for College Scorecard Data Fetching
-
-Handles:
-- Paginated requests to College Scorecard API
-- Rate limit management (1,000 requests/hour)
-- Exponential backoff on failures
-- Local caching of raw JSON responses
-- Progress tracking
-"""
-
-import os
+import requests
 import json
 import time
-import requests
 from pathlib import Path
-from typing import Optional, Dict, List, Any
-from dotenv import load_dotenv
+from collections import OrderedDict
 
-# Load environment variables
-load_dotenv()
-
-API_BASE_URL = os.getenv('API_BASE_URL', 'https://api.data.gov/ed/collegescorecard/v1/schools')
-API_KEY = os.getenv('COLLEGE_SCORECARD_API_KEY')
-API_PER_PAGE = int(os.getenv('API_PER_PAGE', '100'))
-API_TIMEOUT = int(os.getenv('API_TIMEOUT', '30'))
-CACHE_DIR = Path(os.getenv('CACHE_DIR', './data_cache'))
-
-
-class APIClient:
-    """Handles all communication with College Scorecard API."""
-
-    def __init__(self, api_key: str, base_url: str = API_BASE_URL, 
-                 per_page: int = API_PER_PAGE, timeout: int = API_TIMEOUT):
-        """
-        Initialize API Client.
+class CollegeScorecardScraper:
+    def __init__(self, api_key):
+        self.api_key = "xyR4osFpvb3ACnZfRlmYCsJKkTncIOhxsJmLLCVm"
+        self.base_url = "https://api.data.gov/ed/collegescorecard/v1/schools.json"
+        self.cache_dir = Path("GatorGuideV2/DataScraping/DataScrape/data_cache")
+        self.cache_dir.mkdir(exist_ok=True)
         
-        Args:
-            api_key: College Scorecard API key
-            base_url: Base API endpoint URL
-            per_page: Results per page (1-100, default 100)
-            timeout: Request timeout in seconds
-        """
-        self.api_key = api_key
-        self.base_url = base_url
-        self.per_page = min(per_page, 100)  # API max is 100
-        self.timeout = timeout
-        self.session = requests.Session()
-        self.rate_limit_remaining = 1000
-        self.rate_limit_reset = None
-        self.total_institutions = None
-        
-        # Setup cache directory
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        # Mapping for the specific fields we want to pull
+        self.fields = [
+            "id", "school.name", "school.ownership", "school.address", "school.city", "school.state",
+            "school.zip", "school.school_url", "latest.student.size",
+            "latest.student.demographics.student_faculty_ratio",
+            "latest.completion.rate_pooled_4yr", "latest.cost.tuition.out_of_state",
+            "latest.cost.attendance.academic_year", "latest.admissions.test_requirements"
+        ]
 
-    def _get_headers(self) -> Dict[str, str]:
-        """Return request headers with API key."""
-        return {
-            'User-Agent': 'College-Scorecard-Scraper/1.0',
-            'Accept': 'application/json',
-            'api_key': self.api_key
+    def fetch_all(self):
+        params = {
+            "api_key": self.api_key,
+            "fields": ",".join(self.fields),
+            "per_page": 100,
+            "page": 0
         }
 
-    def _handle_rate_limit(self, response: requests.Response):
-        """Extract and handle rate limit info from response headers."""
-        if 'X-RateLimit-Remaining' in response.headers:
-            self.rate_limit_remaining = int(response.headers['X-RateLimit-Remaining'])
-        if 'X-RateLimit-Reset' in response.headers:
-            self.rate_limit_reset = int(response.headers['X-RateLimit-Reset'])
-        
-        if response.status_code == 429:  # Too Many Requests
-            reset_time = int(response.headers.get('X-RateLimit-Reset', time.time())) - int(time.time())
-            wait_time = max(reset_time, 1)
-            print(f"⚠️  Rate limit hit. Waiting {wait_time} seconds...")
-            time.sleep(wait_time + 1)
-            return True
-        return False
+        # Ivy League IDs for the "Type" logic
+        IVY_IDS = [166027, 130794, 190150, 186131, 215062, 182285, 217156, 190415]
 
-    def _exponential_backoff_request(self, url: str, params: Dict[str, Any], 
-                                    max_retries: int = 3) -> Optional[requests.Response]:
-        """
-        Make request with exponential backoff retry logic.
-        
-        Args:
-            url: Request URL
-            params: Query parameters
-            max_retries: Maximum number of retries
-            
-        Returns:
-            Response object or None if all retries failed
-        """
-        for attempt in range(max_retries):
+        while True:
+            print(f"📡 Processing Page {params['page']}...")
             try:
-                response = self.session.get(
-                    url,
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=self.timeout
-                )
-                
-                # Handle rate limiting
-                if self._handle_rate_limit(response):
-                    continue
-                
+                response = requests.get(self.base_url, params=params, timeout=30)
                 response.raise_for_status()
-                return response
-                
-            except requests.exceptions.Timeout:
-                print(f"⏱️  Timeout on attempt {attempt + 1}/{max_retries}. Retrying...")
-                time.sleep(2 ** attempt)
-            except requests.exceptions.ConnectionError:
-                print(f"🔌 Connection error on attempt {attempt + 1}/{max_retries}. Retrying...")
-                time.sleep(2 ** attempt)
-            except requests.exceptions.HTTPError as e:
-                if response.status_code >= 500:
-                    print(f"🔴 Server error {response.status_code} on attempt {attempt + 1}/{max_retries}. Retrying...")
-                    time.sleep(2 ** attempt)
-                else:
-                    print(f"❌ HTTP Error {response.status_code}: {e}")
-                    return None
-            except Exception as e:
-                print(f"❌ Unexpected error on attempt {attempt + 1}/{max_retries}: {e}")
-                return None
-        
-        return None
-
-    def fetch_institutions(self, fields: Optional[List[str]] = None) -> bool:
-        """
-        Fetch all institutions from API and cache locally.
-        
-        Args:
-            fields: Optional list of specific fields to fetch. If None, fetches all.
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        print("🚀 Starting institution data fetch from College Scorecard API...")
-        
-        # Prepare field parameter
-        field_param = ",".join(fields) if fields else None
-        
-        page = 0
-        total_fetched = 0
-        cache_files = []
-        
-        try:
-            while True:
-                print(f"\n📄 Fetching page {page + 1}...")
-                
-                params = {
-                    'page': page,
-                    'per_page': self.per_page,
-                    'api_key': self.api_key
-                }
-                
-                if field_param:
-                    params['fields'] = field_param
-                
-                response = self._exponential_backoff_request(self.base_url, params)
-                if not response:
-                    print(f"❌ Failed to fetch page {page + 1}")
-                    return False
-                
                 data = response.json()
-                
-                # Extract metadata
-                if page == 0:
-                    metadata = data.get('metadata', {})
-                    self.total_institutions = metadata.get('total', 0)
-                    print(f"📊 Total institutions available: {self.total_institutions}")
-                
-                # Cache the raw response
-                cache_file = CACHE_DIR / f"page_{page:05d}.json"
-                with open(cache_file, 'w') as f:
-                    json.dump(data, f, indent=2)
-                cache_files.append(cache_file)
-                
-                # Check results
                 results = data.get('results', [])
+
                 if not results:
-                    print(f"✅ Fetch complete! Retrieved {total_fetched} institutions")
                     break
-                
-                total_fetched += len(results)
-                progress_pct = (total_fetched / self.total_institutions * 100) if self.total_institutions else 0
-                print(f"   ✓ Cached {len(results)} records (Total: {total_fetched}/{self.total_institutions} - {progress_pct:.1f}%)")
-                print(f"   💾 Cached to {cache_file}")
-                print(f"   ⏱️  Rate limit remaining: {self.rate_limit_remaining}")
-                
-                page += 1
-                
-                # Small delay between requests to be API-friendly
-                if self.total_institutions and page < (self.total_institutions // self.per_page + 1):
-                    time.sleep(0.5)
-            
-            print(f"\n✨ All {total_fetched} institutions fetched and cached successfully!")
-            return True
-            
-        except Exception as e:
-            print(f"❌ Error during fetch: {e}")
-            return False
 
-    def get_cached_pages(self) -> List[Dict[str, Any]]:
-        """
-        Load all cached API responses from local files.
-        
-        Returns:
-            List of page data dictionaries
-        """
-        pages = []
-        cache_files = sorted(CACHE_DIR.glob("page_*.json"))
-        
-        print(f"📂 Loading {len(cache_files)} cached pages...")
-        
-        for cache_file in cache_files:
-            try:
-                with open(cache_file, 'r') as f:
-                    page_data = json.load(f)
-                    pages.append(page_data)
+                ordered_results = []
+                for item in results:
+                    url = item.get("school.school_url")
+                    
+                    # Logic to handle nulls with URL fallback
+                    def get_val(key):
+                        val = item.get(key)
+                        if val is None or val == "":
+                            return f"See {url}" if url else None
+                        return val
+
+                    # Create Ordered Dictionary to keep JSON structure consistent
+                    school = OrderedDict([
+                        ("name", item.get("school.name") or (f"See {url}" if url else None)),
+                        ("type", "Ivy League" if item.get("id") in IVY_IDS else ("Public" if item.get("school.ownership") == 1 else "Private")),
+                        ("address", get_val("school.address")),
+                        ("city", get_val("school.city")),
+                        ("state", get_val("school.state")),
+                        ("zipcode", get_val("school.zip")),
+                        ("id", item.get("id")),
+                        ("test_scores_required", get_val("latest.admissions.sat_scores.average.overall") or get_val("latest.admissions.act_scores.average.overall")),
+                        ('latest.admissions.admission_rate.overall', get_val("latest.admissions.admission_rate.overall")),
+                        ("cost_of_attendance", OrderedDict([
+                            ("tuition", item.get("latest.cost.tuition.out_of_state")),
+                            ("living_expenses", item.get("latest.cost.living_expenses"))
+                        ])),
+                        ("number_of_student", item.get("latest.student.size")),
+                        ("staff_student_rate", f"1:{item.get('latest.student.demographics.student_faculty_ratio')}" if item.get('latest.student.demographics.student_faculty_ratio') else None),
+                        ("gar", f"{item.get('latest.completion.rate_pooled_4yr') * 100:.1f}%" if item.get('latest.completion.rate_pooled_4yr') else None),
+                        ("climate", None), # Parameters not in this API
+                        ("courses_and_classes", f"See {url}" if url else None),
+                        ("deadline_dates", None),
+                        ("scholarship", None),
+                        ("school_url", url),
+                        ("english_proficiency_required", None)
+                    ])
+                    ordered_results.append(school)
+
+                # Save page to cache
+                file_path = self.cache_dir / f"page_{params['page']:03d}.json"
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(ordered_results, f, indent=4)
+
+                params["page"] += 1
+                time.sleep(0.5)
+
             except Exception as e:
-                print(f"⚠️  Error loading {cache_file}: {e}")
-        
-        print(f"✅ Loaded {len(pages)} pages from cache")
-        return pages
-
-    def clear_cache(self):
-        """Clear all cached API responses."""
-        cache_files = list(CACHE_DIR.glob("page_*.json"))
-        for cache_file in cache_files:
-            cache_file.unlink()
-        print(f"🗑️  Cleared {len(cache_files)} cached files")
-
+                print(f"❌ Critical Error: {e}")
+                break
 
 if __name__ == "__main__":
-    # Test API client
-    if not API_KEY:
-        print("❌ API_KEY not found in .env file")
-        exit(1)
-    
-    client = APIClient(API_KEY)
-    
-    # Test fetch (limited fields for speed)
-    test_fields = [
-        "id", "school.name", "school.state", "school.city",
-        "latest.student.size", "latest.admissions.admission_rate.overall"
-    ]
-    
-    if client.fetch_institutions(fields=test_fields):
-        pages = client.get_cached_pages()
-        print(f"\n✅ Test successful! Fetched {len(pages)} pages")
+    # Replace with your actual api.data.gov key
+    scraper = CollegeScorecardScraper("YOUR_API_KEY")
+    scraper.fetch_all()

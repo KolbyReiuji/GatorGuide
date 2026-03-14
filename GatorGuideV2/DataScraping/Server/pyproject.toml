@@ -14,6 +14,7 @@ dependencies = [
     "markdown>=3.10.2",
     "mysqlclient>=2.2.8",
     "pillow>=12.1.1",
+    "python-dotenv>=1.2.2",
     "python-slugify>=8.0.4",
     "sqlparse>=0.5.5",
     "text-unidecode>=1.3",

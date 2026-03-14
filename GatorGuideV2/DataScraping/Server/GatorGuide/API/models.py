@@ -1,5 +1,13 @@
 from django.db import models
 
+class User(models.Model):
+    username = models.CharField(max_length=100, unique=True)
+    password = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+
+    def __str__(self):
+        return self.username
+
 class CostOfAttendance(models.Model):
     tuition = models.DecimalField(max_digits=12, decimal_places=2)
     living_expenses = models.DecimalField(max_digits=12, decimal_places=2)

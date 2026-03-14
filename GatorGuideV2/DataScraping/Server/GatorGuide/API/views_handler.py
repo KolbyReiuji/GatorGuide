@@ -1,8 +1,8 @@
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-# from .serializer import UserSerializer
-# from .models import User
+from .serializer import UserSerializer
+from .models import User
 # Create your views here.
 
 # Write your create_user function here

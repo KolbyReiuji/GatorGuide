@@ -8,13 +8,6 @@ class User(models.Model):
     def __str__(self):
         return self.username
 
-class CostOfAttendance(models.Model):
-    tuition = models.DecimalField(max_digits=12, decimal_places=2)
-    living_expenses = models.DecimalField(max_digits=12, decimal_places=2)
-
-    def __str__(self):
-        return f"Tuition: {self.tuition}, Living: {self.living_expenses}"
-
 class School(models.Model):
     # Basic Info
     name = models.CharField(max_length=255)
@@ -36,13 +29,6 @@ class School(models.Model):
     staff_student_rate = models.CharField(max_length=50, help_text="e.g. 1:15")
     gar = models.CharField(max_length=50, verbose_name="Graduation Acceptance Rate")
     
-    # Nested Object (Relationship)
-    cost_of_attendance = models.OneToOneField(
-        CostOfAttendance, 
-        on_delete=models.CASCADE,
-        related_name='school_details'
-    )
-    
     # Miscellaneous
     climate = models.CharField(max_length=255)
     courses_and_classes = models.TextField()
@@ -52,3 +38,16 @@ class School(models.Model):
 
     def __str__(self):
         return self.name
+
+# Reversed the relationship between School and CostOfAttendance, School should be the parent and CostOfAttendance should be the child.
+class CostOfAttendance(models.Model):
+    school = models.OneToOneField(
+        School, 
+        on_delete=models.CASCADE,
+        related_name='cost_of_attendance'
+    )
+    tuition = models.DecimalField(max_digits=12, decimal_places=2)
+    living_expenses = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"Costs for {self.school.name}"

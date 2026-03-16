@@ -1,12 +1,43 @@
 from django.db import models
 
 class User(models.Model):
-    username = models.CharField(max_length=100, unique=True)
-    password = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
+    overall_GPA = models.DecimalField(max_digits=3, decimal_places=2)
+    test_score = models.CharField(max_length=255, blank=True, help_text="SAT/ACT scores")
+    english_proficiency = models.CharField(max_length=255, blank=True, help_text="IELTS/TOEIC/TOEFL scores")
+    personal_statement = models.URLField(max_length=500, unique=True, help_text="Link of your personal statement")
 
     def __str__(self):
-        return self.username
+        return f"Overall GPA: {self.overall_GPA}\nTest Score: {self.test_score}\nEnglish Proficiency: {self.english_proficiency}"
+
+class Transcript(models.Model):
+    user_transcript = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE,
+        related_name='user_transcript'
+    )
+    course_name = models.CharField(max_length=255)
+    credit_unit = models.PositiveIntegerField()
+    course_GPA = models.DecimalField(max_digits=3, decimal_places=2)
+
+    def __str__(self):
+        return f"Course Name: {self.user_transcript.course_name}\nCredit Unit: {self.user_transcript.credit_unit}\nCourse GPA: {self.user_transcript.course_GPA}"
+    
+class Preference(models.Model):
+    personal_preference = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE,
+        related_name='personal_preference'
+    )
+    budget = models.DecimalField(max_digits=12, decimal_places=2)
+    prefer_climate = models.CharField(max_length=255)
+    prefer_location = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"Budget: {self.personal_preference.budget}\nPrefer Climate: {self.personal_preference.prefer_climate}\nPrefer Location: {self.personal_preference.prefer_location}"
+
+
+
+
 
 class School(models.Model):
     # Basic Info

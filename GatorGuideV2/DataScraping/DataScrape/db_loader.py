@@ -3,6 +3,9 @@ import sys
 import django
 import csv
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Path to the Datascrape folder (where this file lives)
 DATASCRAPE_DIR = Path(__file__).resolve().parent
@@ -109,7 +112,8 @@ def safe_str(value, default=""):
 # ==============================================================================
 
 def load_csv_to_django():
-    csv_path = DATASCRAPE_DIR / "data_output" / "final_schools_data_cleaned.csv"
+    output_dir_name = os.getenv("OUTPUT_DIR", "data_output")
+    csv_path = DATASCRAPE_DIR / output_dir_name / "final_schools_data_cleaned.csv"
 
     if not csv_path.exists():
         print(f"❌ CSV not found at: {csv_path}")
@@ -147,12 +151,7 @@ def load_csv_to_django():
                 continue
 
             try:
-                # Always create a fresh CostOfAttendance record
-                cost_obj = CostOfAttendance.objects.create(
-                    tuition=safe_decimal(row.get("tuition")),
-                    living_expenses=safe_decimal(row.get("living_expenses")),
-                )
-
+                # 1. Create or Update the School first
                 school, created = School.objects.update_or_create(
                     school_id=school_id,
                     defaults={
@@ -172,8 +171,16 @@ def load_csv_to_django():
                         "deadline_dates":               safe_str(row.get("deadline_dates")),
                         "scholarship_info":             safe_str(row.get("scholarship")),
                         "school_url":                   safe_str(row.get("school_url")),
-                        "cost_of_attendance":           cost_obj,
                     },
+                )
+
+                # 2. Create or Update CostOfAttendance linkage
+                CostOfAttendance.objects.update_or_create(
+                    school=school,
+                    defaults={
+                        "tuition": safe_decimal(row.get("tuition")),
+                        "living_expenses": safe_decimal(row.get("living_expenses")),
+                    }
                 )
 
                 action = "Created" if created else "Updated"

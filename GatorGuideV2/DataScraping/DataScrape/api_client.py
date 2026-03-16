@@ -1,15 +1,23 @@
+import os
+
 import requests
 import json
 import time
 from pathlib import Path
 from collections import OrderedDict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class CollegeScorecardScraper:
     def __init__(self, api_key):
-        self.api_key = "xyR4osFpvb3ACnZfRlmYCsJKkTncIOhxsJmLLCVm"
-        self.base_url = "https://api.data.gov/ed/collegescorecard/v1/schools.json"
-        self.cache_dir = Path("GatorGuideV2/DataScraping/DataScrape/data_cache")
-        self.cache_dir.mkdir(exist_ok=True)
+        self.api_key = api_key or os.getenv("API_KEY")
+        self.base_url = os.getenv("API_BASE_URL", "https://api.data.gov/ed/collegescorecard/v1/schools") + ".json"
+        
+        # Use CACHE_DIR from .env or default to local 'data_cache'
+        cache_env = os.getenv("CACHE_DIR", "data_cache")
+        self.cache_dir = Path(cache_env)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         # Mapping for the specific fields we want to pull
         self.fields = [
@@ -21,10 +29,13 @@ class CollegeScorecardScraper:
         ]
 
     def fetch_all(self):
+        per_page = int(os.getenv("API_PER_PAGE", 100))
+        timeout = int(os.getenv("API_TIMEOUT", 30))
+        
         params = {
             "api_key": self.api_key,
             "fields": ",".join(self.fields),
-            "per_page": 100,
+            "per_page": per_page,
             "page": 0
         }
 
@@ -34,7 +45,7 @@ class CollegeScorecardScraper:
         while True:
             print(f"📡 Processing Page {params['page']}...")
             try:
-                response = requests.get(self.base_url, params=params, timeout=30)
+                response = requests.get(self.base_url, params=params, timeout=timeout)
                 response.raise_for_status()
                 data = response.json()
                 results = data.get('results', [])
@@ -94,5 +105,5 @@ class CollegeScorecardScraper:
 
 if __name__ == "__main__":
     # Replace with your actual api.data.gov key
-    scraper = CollegeScorecardScraper("YOUR_API_KEY")
+    scraper = CollegeScorecardScraper(os.getenv("API_KEY"))
     scraper.fetch_all()

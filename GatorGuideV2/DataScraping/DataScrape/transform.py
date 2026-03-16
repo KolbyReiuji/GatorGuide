@@ -2,11 +2,15 @@ import json
 import csv
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def transform_data():
     # 1. Setup Paths
-    cache_dir = Path("GatorGuideV2/DataScraping/DataScrape/data_cache")
-    output_dir = Path("GatorGuideV2/DataScraping/DataScrape/data_output")
+    current_dir = Path(__file__).parent
+    cache_dir = current_dir / os.getenv("CACHE_DIR", "data_cache")
+    output_dir = current_dir / os.getenv("OUTPUT_DIR", "data_output")
     output_dir.mkdir(exist_ok=True)
     
     output_file = output_dir / "final_schools_data_cleaned.csv"
@@ -35,9 +39,18 @@ def transform_data():
         with open(file_path, 'r', encoding='utf-8') as f:
             try:
                 page_data = json.load(f)
+                
+                # Check if page_data is an empty list or not iterable (e.g. dict)
+                if not isinstance(page_data, list):
+                    print(f"⚠️ Skipping non-list file: {file_path}")
+                    continue
+
                 for school in page_data:
-                    # Flatten the cost_of_attendance object
-                    cost = school.get("cost_of_attendance", {})
+                    if not isinstance(school, dict):
+                        continue
+
+                    # Flatten the cost_of_attendance object, handle None
+                    cost = school.get("cost_of_attendance") or {}
                     
                     # Map the JSON keys to the CSV row
                     row = {

@@ -18,8 +18,8 @@ class UserSerializer(serializers.ModelSerializer):
         model = mdls.User
         fields = '__all__'
     # Manually add the field back using the 'related_name' we set in models.py
-    user_transcript = TranscriptSerializer(read_only=True)
-    personal_preference = PreferenceSerializer(read_only=True)
+    transcript = TranscriptSerializer(read_only=True)
+    preference = PreferenceSerializer(read_only=True)
 
 # Schools serializer
 

@@ -13,30 +13,30 @@ class User(models.Model):
         return f"Overall GPA: {self.overall_GPA}\nTest Score: {self.test_score}\nEnglish Proficiency: {self.english_proficiency}"
 
 class Transcript(models.Model):
-    user_transcript = models.OneToOneField(
+    user = models.OneToOneField(
         User, 
         on_delete=models.CASCADE,
-        related_name='user_transcript'
+        related_name='transcript'
     )
     course_name = models.CharField(max_length=255)
     credit_unit = models.PositiveIntegerField()
     course_GPA = models.DecimalField(max_digits=3, decimal_places=2)
 
     def __str__(self):
-        return f"Course Name: {self.user_transcript.course_name}\nCredit Unit: {self.user_transcript.credit_unit}\nCourse GPA: {self.user_transcript.course_GPA}"
+        return f"Course Name: {self.course_name}\nCredit Unit: {self.credit_unit}\nCourse GPA: {self.course_GPA}"
     
 class Preference(models.Model):
-    personal_preference = models.OneToOneField(
+    user = models.OneToOneField(
         User, 
         on_delete=models.CASCADE,
-        related_name='personal_preference'
+        related_name='preference'
     )
     budget = models.DecimalField(max_digits=12, decimal_places=2)
     prefer_climate = models.CharField(max_length=255)
     prefer_location = models.CharField(max_length=255)
 
     def __str__(self):
-        return f"Budget: {self.personal_preference.budget}\nPrefer Climate: {self.personal_preference.prefer_climate}\nPrefer Location: {self.personal_preference.prefer_location}"
+        return f"Budget: {self.budget}\nPrefer Climate: {self.prefer_climate}\nPrefer Location: {self.prefer_location}"
     
 # Schools
 
@@ -82,4 +82,4 @@ class CostOfAttendance(models.Model):
     living_expenses = models.DecimalField(max_digits=12, decimal_places=2)
 
     def __str__(self):
-        return f"Costs for {self.school.name}"
+        return f"Costs for {self.school.name}: Tuition: {self.tuition}, Living Expenses: {self.living_expenses}"

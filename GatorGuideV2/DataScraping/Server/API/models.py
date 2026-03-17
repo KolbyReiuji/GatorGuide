@@ -1,5 +1,7 @@
 from django.db import models
 
+#Users
+
 class User(models.Model):
     user_id = models.CharField(max_length=100, unique=True)
     overall_GPA = models.DecimalField(max_digits=3, decimal_places=2)
@@ -35,10 +37,8 @@ class Preference(models.Model):
 
     def __str__(self):
         return f"Budget: {self.personal_preference.budget}\nPrefer Climate: {self.personal_preference.prefer_climate}\nPrefer Location: {self.personal_preference.prefer_location}"
-
-
-
-
+    
+# Schools
 
 class School(models.Model):
     # Basic Info

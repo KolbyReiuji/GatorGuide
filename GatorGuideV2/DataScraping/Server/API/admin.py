@@ -4,8 +4,7 @@ from .models import User, CostOfAttendance, School
 # Register your models here.
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    # It is safer to exclude the password from the list view
-    list_display = ('username', 'email') 
+    list_display = ('user_id', 'overall_GPA')
 
 class CostOfAttendanceInline(admin.StackedInline):
     model = CostOfAttendance
